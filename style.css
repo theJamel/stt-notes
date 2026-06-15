@@ -1,0 +1,306 @@
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface2: #334155;
+  --accent: #38bdf8;
+  --danger: #f87171;
+  --success: #4ade80;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --radius: 12px;
+  --record-size: 100px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* All screens hidden by default; JS shows the correct one */
+.screen {
+  height: 100dvh;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+}
+
+.screen-inner {
+  width: 100%;
+  max-width: 520px;
+  padding: 28px 20px;
+  padding-bottom: max(28px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  flex: 1;
+}
+
+.screen-inner.centered {
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+h1 { font-size: 1.6rem; font-weight: 700; }
+h2 { font-size: 1.3rem; font-weight: 700; }
+
+.muted { color: var(--muted); font-size: 0.9rem; }
+.hint  { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+
+/* Form */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+input, select, textarea {
+  background: var(--surface);
+  border: 1.5px solid var(--surface2);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+  padding: 12px 14px;
+  width: 100%;
+  transition: border-color 0.15s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.password-row {
+  display: flex;
+  gap: 8px;
+}
+
+.password-row input { flex: 1; }
+
+#btn-show-password {
+  background: var(--surface2);
+  border: 1.5px solid var(--surface2);
+  border-radius: var(--radius);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0 14px;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+#btn-show-password:hover { background: var(--surface); }
+
+/* Buttons */
+.btn-primary, .btn-secondary {
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  padding: 14px 20px;
+  transition: opacity 0.15s, transform 0.1s;
+  flex: 1;
+}
+
+.btn-primary  { background: var(--accent); color: #0f172a; }
+.btn-secondary { background: var(--surface2); color: var(--text); }
+
+.btn-primary:hover  { opacity: 0.9; }
+.btn-secondary:hover { opacity: 0.85; }
+
+.btn-primary:active,
+.btn-secondary:active { transform: scale(0.97); }
+
+.btn-primary:disabled,
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.btn-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 50%;
+  transition: background 0.15s;
+  line-height: 1;
+}
+
+.btn-icon:hover { background: var(--surface); }
+
+.btn-icon.top-right {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.btn-install {
+  display: none;
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  background: var(--accent);
+  border: none;
+  border-radius: 20px;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 7px 14px;
+}
+
+/* Model download progress */
+.model-progress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 80%;
+  max-width: 300px;
+  margin-bottom: 28px;
+}
+
+.model-progress progress {
+  width: 100%;
+  height: 6px;
+  appearance: none;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.model-progress progress::-webkit-progress-bar  { background: var(--surface2); }
+.model-progress progress::-webkit-progress-value { background: var(--accent); transition: width 0.3s; }
+.model-progress progress::-moz-progress-bar       { background: var(--accent); }
+
+.model-progress span {
+  font-size: 0.78rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Record button */
+.btn-record {
+  width: var(--record-size);
+  height: var(--record-size);
+  border-radius: 50%;
+  border: none;
+  background: var(--surface);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 5px var(--surface2);
+  transition: transform 0.1s, box-shadow 0.2s;
+  margin-bottom: 18px;
+}
+
+.btn-record:not(:disabled):active { transform: scale(0.93); }
+
+.btn-record:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-record-icon {
+  display: block;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  transition: background 0.2s, border-radius 0.15s, width 0.15s, height 0.15s;
+}
+
+/* Recording state: red pulsing square */
+.btn-record[data-state="recording"] {
+  box-shadow: 0 0 0 5px var(--danger), 0 0 22px 4px rgba(248,113,113,0.35);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.btn-record[data-state="recording"] .btn-record-icon {
+  background: var(--danger);
+  border-radius: 5px;
+  width: 30px;
+  height: 30px;
+}
+
+/* Processing state: spinning muted square */
+.btn-record[data-state="processing"] .btn-record-icon {
+  background: var(--muted);
+  border-radius: 4px;
+  width: 26px;
+  height: 26px;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 5px var(--danger), 0 0 14px 2px rgba(248,113,113,0.3); }
+     50%    { box-shadow: 0 0 0 9px var(--danger), 0 0 28px 8px rgba(248,113,113,0.4); }
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.record-label {
+  color: var(--muted);
+  font-size: 0.95rem;
+  user-select: none;
+}
+
+/* Review screen */
+textarea {
+  resize: vertical;
+  min-height: 180px;
+  line-height: 1.6;
+}
+
+/* Toasts */
+.toast {
+  position: fixed;
+  bottom: max(24px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: var(--surface);
+  border: 1.5px solid var(--surface2);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+  color: var(--text);
+  font-size: 0.9rem;
+  max-width: min(90vw, 380px);
+  opacity: 0;
+  padding: 14px 20px;
+  text-align: center;
+  transition: transform 0.25s ease, opacity 0.25s ease;
+  z-index: 200;
+  pointer-events: none;
+}
+
+.toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.toast-success { border-color: var(--success); }
+.toast-error   { border-color: var(--danger);  }
