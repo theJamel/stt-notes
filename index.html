@@ -32,17 +32,21 @@
 
         <div class="field">
           <label for="input-username">Username</label>
-          <input id="input-username" type="text" required autocomplete="username" placeholder="alice">
+          <input id="input-username" type="text" required autocomplete="off"
+            autocapitalize="none" autocorrect="off" spellcheck="false"
+            data-lpignore="true" data-1p-ignore data-bwignore placeholder="alice">
         </div>
 
         <div class="field">
           <label for="input-password">App Password</label>
           <div class="password-row">
-            <input id="input-password" type="password" required autocomplete="current-password"
+            <input id="input-password" type="password" required autocomplete="new-password"
+              autocapitalize="none" autocorrect="off" spellcheck="false"
+              data-lpignore="true" data-1p-ignore data-bwignore
               placeholder="xxxx-xxxx-xxxx-xxxx">
             <button type="button" id="btn-show-password" aria-label="Show password">&#128065;</button>
           </div>
-          <span class="hint">NextCloud &rarr; Settings &rarr; Security &rarr; App passwords</span>
+          <span class="hint">Use a NextCloud <strong>App Password</strong> (Settings &rarr; Security), not your login password</span>
         </div>
 
         <div class="field">
