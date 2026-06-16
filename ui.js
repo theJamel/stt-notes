@@ -32,6 +32,22 @@ export function setProgress(data) {
   }
 }
 
+export function populateLists(lists, selectedHref) {
+  const sel = document.getElementById('select-list');
+  sel.innerHTML = '';
+  for (const l of lists) {
+    const opt = document.createElement('option');
+    opt.value = l.href;
+    opt.textContent = l.name;
+    if (l.href === selectedHref) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+export function getSelectedList() {
+  return document.getElementById('select-list').value;
+}
+
 export function showToast(message, type = 'info') {
   const toast = Object.assign(document.createElement('div'), {
     className: `toast toast-${type}`,

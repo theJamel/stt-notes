@@ -1,0 +1,9 @@
+# Serve the PWA directly, bypassing NextCloud's front controller.
+# Needed when the app is deployed inside a NextCloud webroot subfolder so
+# Apache serves index.html instead of falling through to NextCloud's index.php.
+DirectoryIndex index.html
+RewriteEngine On
+# Serve any file/dir that actually exists, then stop further rewriting.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]

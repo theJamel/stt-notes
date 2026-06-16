@@ -1,5 +1,5 @@
 // sw.js — service worker: cache-first for app shell
-const CACHE = 'stt-notes-v1';
+const CACHE = 'stt-notes-v2';
 
 const SHELL = [
   './',

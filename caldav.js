@@ -1,5 +1,5 @@
 // caldav.js — creates VTODO items on NextCloud via CalDAV PUT
-export async function createTodo({ url, username, password }, summary) {
+export async function createTodo({ username, password }, listUrl, summary) {
   const uid      = `${Date.now()}-${Math.random().toString(36).slice(2)}@stt-notes`;
   const dtstamp  = toICalDate(new Date());
 
@@ -17,7 +17,7 @@ export async function createTodo({ url, username, password }, summary) {
     'END:VCALENDAR',
   ].join('\r\n');
 
-  const targetUrl = `${url.replace(/\/$/, '')}/${uid}.ics`;
+  const targetUrl = `${listUrl.replace(/\/$/, '')}/${uid}.ics`;
 
   const response = await fetch(targetUrl, {
     method: 'PUT',
@@ -29,6 +29,54 @@ export async function createTodo({ url, username, password }, summary) {
   });
 
   return { ok: response.ok, status: response.status, statusText: response.statusText };
+}
+
+// Discover all task lists (calendar collections that support VTODO) under the
+// account's calendar home, derived from the configured URL.
+export async function discoverTaskLists({ url, username, password }) {
+  const home = calendarHome(url);
+  const response = await fetch(home, {
+    method: 'PROPFIND',
+    headers: {
+      'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+      'Content-Type':  'application/xml; charset=utf-8',
+      'Depth':         '1',
+    },
+    body:
+      '<?xml version="1.0" encoding="utf-8"?>' +
+      '<d:propfind xmlns:d="DAV:" xmlns:cal="urn:ietf:params:xml:ns:caldav">' +
+      '<d:prop><d:displayname/><d:resourcetype/>' +
+      '<cal:supported-calendar-component-set/></d:prop></d:propfind>',
+  });
+
+  if (!(response.ok || response.status === 207)) {
+    const err = new Error(`${response.status} ${response.statusText}`);
+    err.status = response.status;
+    throw err;
+  }
+
+  const DAV = 'DAV:';
+  const CAL = 'urn:ietf:params:xml:ns:caldav';
+  const xml = new DOMParser().parseFromString(await response.text(), 'application/xml');
+
+  const lists = [];
+  for (const r of xml.getElementsByTagNameNS(DAV, 'response')) {
+    const href = r.getElementsByTagNameNS(DAV, 'href')[0]?.textContent?.trim();
+    if (!href) continue;
+    const isCalendar  = r.getElementsByTagNameNS(CAL, 'calendar').length > 0;
+    const supportsTodo = [...r.getElementsByTagNameNS(CAL, 'comp')]
+      .some(c => c.getAttribute('name') === 'VTODO');
+    if (!isCalendar || !supportsTodo) continue;
+    const name = r.getElementsByTagNameNS(DAV, 'displayname')[0]?.textContent?.trim() || href;
+    lists.push({ href: new URL(href, url).href, name });
+  }
+  return lists;
+}
+
+// Strip a configured URL back to the calendar home: .../calendars/<user>/
+function calendarHome(url) {
+  const m = url.match(/^(.*\/calendars\/[^/]+\/)/);
+  return m ? m[1] : url.replace(/\/$/, '') + '/';
 }
 
 export async function testConnection({ url, username, password }) {

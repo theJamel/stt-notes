@@ -1,14 +1,29 @@
 // app.js — main orchestrator
 import { startRecording, stopRecording } from './audio.js';
 import { initWorker, loadModel, transcribe } from './stt.js';
-import { createTodo, testConnection } from './caldav.js';
-import { showScreen, setButtonState, setModelReady, setProgress, showToast } from './ui.js';
+import { createTodo, testConnection, discoverTaskLists } from './caldav.js';
+import { showScreen, setButtonState, setModelReady, setProgress, showToast,
+         populateLists, getSelectedList } from './ui.js';
 
 let settings = null;
 let isRecording = false;
 let workerInitialized = false;
 let currentModel = null;
 let installPrompt = null;
+let taskLists = [];
+
+async function loadLists() {
+  try {
+    taskLists = await discoverTaskLists(settings);
+  } catch {
+    taskLists = [];
+  }
+  if (!taskLists.length) {
+    // Discovery failed (offline/CORS/auth) — fall back to the configured URL
+    taskLists = [{ href: settings.url, name: 'Default list' }];
+  }
+  populateLists(taskLists, localStorage.getItem('stt_last_list') ?? settings.url);
+}
 
 function getSettings() {
   try {
@@ -71,6 +86,7 @@ async function init() {
   if (settings?.url && settings?.username && settings?.password) {
     showScreen('main');
     startApp();
+    loadLists();
   } else {
     showScreen('settings');
   }
@@ -88,6 +104,7 @@ async function init() {
     saveSettings(settings);
     showScreen('main');
     startApp();
+    loadLists();
   });
 
   // Test connection button
@@ -157,9 +174,11 @@ async function init() {
 
     const btn = document.getElementById('btn-save');
     btn.disabled = true;
+    const listUrl = getSelectedList() || settings.url;
     try {
-      const result = await createTodo(settings, text);
+      const result = await createTodo(settings, listUrl, text);
       if (result.ok) {
+        localStorage.setItem('stt_last_list', listUrl);
         showToast('Saved to NextCloud!', 'success');
         showScreen('main');
       } else {
