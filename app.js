@@ -42,18 +42,19 @@ function populateSettingsForm() {
   document.getElementById('input-url').value      = settings.url      ?? '';
   document.getElementById('input-username').value = settings.username ?? '';
   document.getElementById('input-password').value = settings.password ?? '';
-  document.getElementById('input-model').value    = settings.model    ?? 'Xenova/whisper-tiny';
+  document.getElementById('input-model').value    = settings.model    ?? 'onnx-community/whisper-tiny';
   document.getElementById('input-language').value = settings.language ?? 'auto';
 }
 
 function startApp() {
-  const model = settings?.model ?? 'Xenova/whisper-tiny';
+  const model = settings?.model ?? 'onnx-community/whisper-tiny';
   if (!workerInitialized) {
     workerInitialized = true;
     setModelReady(false);
     initWorker(
       (progress) => setProgress(progress),
-      (err)      => showToast(`Model error: ${err.message}`, 'error')
+      (err)      => showToast(`Model error: ${err.message}`, 'error'),
+      (backend)  => showToast(backend === 'webgpu' ? 'Ready — GPU accelerated' : 'Ready — CPU mode', 'success')
     );
     loadModel(model);
     currentModel = model;

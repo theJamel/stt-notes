@@ -2,11 +2,13 @@
 let worker = null;
 let onProgressCallback = null;
 let onErrorCallback    = null;
+let onReadyCallback    = null;
 let pendingTranscription = null; // { resolve, reject }
 
-export function initWorker(onProgress, onError) {
+export function initWorker(onProgress, onError, onReady) {
   onProgressCallback = onProgress;
   onErrorCallback    = onError;
+  onReadyCallback    = onReady;
 
   worker = new Worker('./worker.js', { type: 'module' });
 
@@ -16,7 +18,8 @@ export function initWorker(onProgress, onError) {
         onProgressCallback?.(data);
         break;
       case 'ready':
-        onProgressCallback?.(null); // null signals model is ready
+        onProgressCallback?.(null);       // null signals model is ready
+        onReadyCallback?.(data.backend);  // 'webgpu' | 'wasm'
         break;
       case 'complete':
         pendingTranscription?.resolve(data.text);

@@ -1,31 +1,60 @@
-// worker.js — Whisper pipeline running in a Web Worker (module)
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+// worker.js — Whisper pipeline running in a Web Worker (module).
+// Transformers.js v3: tries WebGPU first, falls back to multi-threaded WASM.
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 
-// Disable local model lookup — all files come from HuggingFace Hub CDN
+// Disable local model lookup — all files come from the HuggingFace Hub CDN.
 env.allowLocalModels = false;
 
-// When the page is cross-origin isolated (COOP+COEP set), SharedArrayBuffer is
-// available and ONNX Runtime can run the model multi-threaded across all cores.
+// When cross-origin isolated (COOP+COEP set), the WASM fallback can run
+// multi-threaded across all cores.
 if (self.crossOriginIsolated) {
   env.backends.onnx.wasm.numThreads = navigator.hardwareConcurrency || 4;
 }
 
 let transcriber = null;
 
+async function hasWebGPU() {
+  if (!('gpu' in navigator)) return false;
+  try {
+    return !!(await navigator.gpu.requestAdapter());
+  } catch {
+    return false;
+  }
+}
+
+async function loadModel(model) {
+  // v3 models live under onnx-community/*; migrate any saved Xenova/* id.
+  model = model.replace(/^Xenova\//, 'onnx-community/');
+  const progress_callback = (p) => self.postMessage({ status: 'progress', ...p });
+
+  if (await hasWebGPU()) {
+    try {
+      transcriber = await pipeline('automatic-speech-recognition', model, {
+        device: 'webgpu',
+        // fp32 encoder + q4 decoder is the standard fast WebGPU Whisper config.
+        dtype: { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+        progress_callback,
+      });
+      self.postMessage({ status: 'ready', backend: 'webgpu' });
+      return;
+    } catch (err) {
+      // WebGPU init failed (driver/model issue) — fall through to WASM.
+      self.postMessage({ status: 'progress', name: 'WebGPU unavailable — using CPU', progress: 0 });
+    }
+  }
+
+  transcriber = await pipeline('automatic-speech-recognition', model, {
+    device: 'wasm',
+    dtype: 'q8',
+    progress_callback,
+  });
+  self.postMessage({ status: 'ready', backend: 'wasm' });
+}
+
 self.addEventListener('message', async ({ data }) => {
   if (data.type === 'load') {
     try {
-      transcriber = await pipeline(
-        'automatic-speech-recognition',
-        data.model ?? 'Xenova/whisper-tiny',
-        {
-          quantized: data.quantized ?? true,
-          progress_callback: (progress) => {
-            self.postMessage({ status: 'progress', ...progress });
-          },
-        }
-      );
-      self.postMessage({ status: 'ready' });
+      await loadModel(data.model ?? 'onnx-community/whisper-tiny');
     } catch (err) {
       self.postMessage({ status: 'error', message: err.message });
     }
@@ -39,9 +68,9 @@ self.addEventListener('message', async ({ data }) => {
     }
     try {
       const result = await transcriber(data.audio, {
-        language:       data.language ?? null,
-        task:           'transcribe',
-        chunk_length_s: 30,
+        language:        data.language ?? null,
+        task:            'transcribe',
+        chunk_length_s:  30,
         stride_length_s: 5,
       });
       self.postMessage({ status: 'complete', text: result.text });
