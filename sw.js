@@ -1,5 +1,5 @@
 // sw.js — service worker: cache-first for app shell
-const CACHE = 'stt-notes-v4';
+const CACHE = 'stt-notes-v5';
 
 const SHELL = [
   './',
@@ -16,7 +16,16 @@ const SHELL = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)));
+  // Fetch with cache: 'reload' so the browser HTTP cache (which NextCloud marks
+  // as cacheable for ~6 months on .js files) is bypassed and we always install
+  // the freshest shell from the network.
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    await Promise.all(SHELL.map(async (url) => {
+      const resp = await fetch(url, { cache: 'reload' });
+      if (resp.ok) await cache.put(url, resp);
+    }));
+  })());
   self.skipWaiting();
 });
 
