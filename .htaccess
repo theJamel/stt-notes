@@ -7,3 +7,14 @@ RewriteEngine On
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
+
+# NextCloud's root .htaccess sets a 6-month expiry on JS/CSS, which otherwise
+# applies here too and makes Cloudflare/browsers cache the app shell for months
+# (so updates — especially the service worker — never get picked up). Disable
+# it for this folder and require revalidation instead.
+<IfModule mod_expires.c>
+  ExpiresActive Off
+</IfModule>
+<IfModule mod_headers.c>
+  Header set Cache-Control "no-cache, must-revalidate"
+</IfModule>
