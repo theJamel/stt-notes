@@ -16,5 +16,9 @@ RewriteRule ^ - [L]
   ExpiresActive Off
 </IfModule>
 <IfModule mod_headers.c>
-  Header set Cache-Control "no-cache, must-revalidate"
+  # Must be a FilesMatch to override NextCloud's own FilesMatch rule, which
+  # otherwise sets "max-age=..., immutable" on every .js/.css file.
+  <FilesMatch ".*">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
 </IfModule>
