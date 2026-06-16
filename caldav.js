@@ -80,7 +80,9 @@ function calendarHome(url) {
 }
 
 export async function testConnection({ url, username, password }) {
-  const response = await fetch(url.replace(/\/$/, ''), {
+  // Keep the trailing slash — NextCloud's DAV collections are canonical with it.
+  const target = url.endsWith('/') ? url : url + '/';
+  const response = await fetch(target, {
     method: 'PROPFIND',
     headers: {
       'Authorization': 'Basic ' + btoa(`${username}:${password}`),
