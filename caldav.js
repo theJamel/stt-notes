@@ -21,6 +21,9 @@ export async function createTodo({ username, password }, listUrl, summary) {
 
   const response = await fetch(targetUrl, {
     method: 'PUT',
+    // Omit cookies so NextCloud authenticates via the Basic Auth header, not a
+    // stale same-origin session cookie (which would 401 without a CSRF token).
+    credentials: 'omit',
     headers: {
       'Content-Type':  'text/calendar; charset=utf-8',
       'Authorization': 'Basic ' + btoa(`${username}:${password}`),
@@ -37,6 +40,7 @@ export async function discoverTaskLists({ url, username, password }) {
   const home = calendarHome(url);
   const response = await fetch(home, {
     method: 'PROPFIND',
+    credentials: 'omit',
     headers: {
       'Authorization': 'Basic ' + btoa(`${username}:${password}`),
       'Content-Type':  'application/xml; charset=utf-8',
@@ -84,6 +88,7 @@ export async function testConnection({ url, username, password }) {
   const target = url.endsWith('/') ? url : url + '/';
   const response = await fetch(target, {
     method: 'PROPFIND',
+    credentials: 'omit',
     headers: {
       'Authorization': 'Basic ' + btoa(`${username}:${password}`),
       'Content-Type':  'application/xml',
