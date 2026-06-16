@@ -22,5 +22,11 @@ RewriteRule ^ - [L]
   # .htaccess.
   <If "true">
     Header set Cache-Control "no-cache, must-revalidate"
+    # Cross-origin isolation enables SharedArrayBuffer, which lets the Whisper
+    # WASM backend run multi-threaded — much faster transcription on mobile.
+    # 'credentialless' keeps cross-origin CDN fetches (jsDelivr, HuggingFace)
+    # working without requiring CORP headers on them.
+    Header set Cross-Origin-Opener-Policy "same-origin"
+    Header set Cross-Origin-Embedder-Policy "credentialless"
   </If>
 </IfModule>

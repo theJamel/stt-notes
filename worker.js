@@ -4,6 +4,12 @@ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers
 // Disable local model lookup — all files come from HuggingFace Hub CDN
 env.allowLocalModels = false;
 
+// When the page is cross-origin isolated (COOP+COEP set), SharedArrayBuffer is
+// available and ONNX Runtime can run the model multi-threaded across all cores.
+if (self.crossOriginIsolated) {
+  env.backends.onnx.wasm.numThreads = navigator.hardwareConcurrency || 4;
+}
+
 let transcriber = null;
 
 self.addEventListener('message', async ({ data }) => {
