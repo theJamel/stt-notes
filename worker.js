@@ -2,6 +2,34 @@
 // Transformers.js v3: tries WebGPU first, falls back to multi-threaded WASM.
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 
+// Persist model weights in Cache API so a hard reload (which bypasses the SW)
+// doesn't force a full re-download. Cache API is only cleared by explicit
+// "Clear site data" — not by page reload, not by SW version bumps.
+const MODEL_CACHE = 'voxnote-model-v1';
+const _fetch = globalThis.fetch.bind(globalThis);
+globalThis.fetch = async (input, init) => {
+  let isModel = false;
+  try {
+    const href = (input instanceof Request) ? input.url : String(input);
+    const { hostname } = new URL(href, self.location.href);
+    isModel = hostname.endsWith('huggingface.co') || hostname.endsWith('hf.co');
+  } catch { /* relative/opaque URL — pass through */ }
+
+  if (!isModel) return _fetch(input, init);
+
+  try {
+    const cache = await caches.open(MODEL_CACHE);
+    const hit = await cache.match(input);
+    if (hit) return hit;
+    const resp = await _fetch(input, init);
+    // Only cache complete responses — 206 range replies can't be stored.
+    if (resp.ok && resp.status === 200) cache.put(input, resp.clone());
+    return resp;
+  } catch {
+    return _fetch(input, init);  // cache unavailable — fall through to network
+  }
+};
+
 // Disable local model lookup — all files come from the HuggingFace Hub CDN.
 env.allowLocalModels = false;
 

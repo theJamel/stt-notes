@@ -1,13 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#0f172a"/>
-  <!-- Microphone capsule -->
-  <rect x="196" y="88" width="120" height="208" rx="60" fill="#38bdf8"/>
-  <!-- Arc -->
-  <path d="M136 256 C136 368 376 368 376 256"
-        fill="none" stroke="#38bdf8" stroke-width="26" stroke-linecap="round"/>
-  <!-- Stand -->
-  <line x1="256" y1="368" x2="256" y2="424"
-        stroke="#38bdf8" stroke-width="26" stroke-linecap="round"/>
-  <line x1="172" y1="424" x2="340" y2="424"
-        stroke="#38bdf8" stroke-width="26" stroke-linecap="round"/>
+  <defs>
+    <radialGradient id="orb" cx="38%" cy="32%" r="60%" gradientUnits="objectBoundingBox">
+      <stop offset="0%"   stop-color="#ff8a5d"/>
+      <stop offset="60%"  stop-color="#ff6a3d"/>
+      <stop offset="100%" stop-color="#e84f23"/>
+    </radialGradient>
+  </defs>
+  <!-- Warm dark background -->
+  <rect width="512" height="512" rx="96" fill="#15110e"/>
+  <!-- Ember orb: coral ring matching the app's main button -->
+  <circle cx="256" cy="256" r="185" fill="url(#orb)"/>
+  <circle cx="256" cy="256" r="95"  fill="#15110e"/>
 </svg>
