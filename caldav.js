@@ -1,4 +1,12 @@
 // caldav.js — creates VTODO items on NextCloud via CalDAV PUT
+
+// All requests authenticate via the Basic Auth header (not a session cookie),
+// so callers pair this with credentials: 'omit' to avoid a stale same-origin
+// NextCloud session 401ing without a CSRF token.
+function authHeader(username, password) {
+  return 'Basic ' + btoa(`${username}:${password}`);
+}
+
 export async function createTodo({ username, password }, listUrl, summary) {
   const uid      = `${Date.now()}-${Math.random().toString(36).slice(2)}@stt-notes`;
   const dtstamp  = toICalDate(new Date());
@@ -21,12 +29,10 @@ export async function createTodo({ username, password }, listUrl, summary) {
 
   const response = await fetch(targetUrl, {
     method: 'PUT',
-    // Omit cookies so NextCloud authenticates via the Basic Auth header, not a
-    // stale same-origin session cookie (which would 401 without a CSRF token).
     credentials: 'omit',
     headers: {
       'Content-Type':  'text/calendar; charset=utf-8',
-      'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+      'Authorization': authHeader(username, password),
     },
     body: vcal,
   });
@@ -42,7 +48,7 @@ export async function discoverTaskLists({ url, username, password }) {
     method: 'PROPFIND',
     credentials: 'omit',
     headers: {
-      'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+      'Authorization': authHeader(username, password),
       'Content-Type':  'application/xml; charset=utf-8',
       'Depth':         '1',
     },
@@ -90,7 +96,7 @@ export async function testConnection({ url, username, password }) {
     method: 'PROPFIND',
     credentials: 'omit',
     headers: {
-      'Authorization': 'Basic ' + btoa(`${username}:${password}`),
+      'Authorization': authHeader(username, password),
       'Content-Type':  'application/xml',
       'Depth':         '0',
     },
