@@ -1,5 +1,6 @@
 /* ===== Ember theme — voxnote ===== */
 :root {
+  color-scheme: dark;      /* dark UA surfaces (nav-bar area, overscroll, scrollbars) */
   --bg:          #15110e;  /* warm near-black app background */
   --surface:     #221a15;  /* cards, inputs */
   --border:      #322820;  /* hairline borders */
@@ -28,6 +29,8 @@ html, body {
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;     /* no white overscroll bleed past the dark page */
+  touch-action: manipulation;    /* disable double-tap / pinch zoom */
 }
 
 button { font-family: inherit; }
