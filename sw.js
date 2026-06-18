@@ -1,5 +1,32 @@
 // sw.js — service worker: cache-first for app shell
-const CACHE = 'stt-notes-v7';
+const CACHE = 'stt-notes-v14';
+
+// Separate bucket for cross-origin runtime deps (Transformers.js, ONNX WASM,
+// Whisper weights). These are too big/dynamic to precache in SHELL, and they'd
+// otherwise live only in the evictable browser HTTP cache — once evicted the app
+// can't boot offline. We cache them on first use so the "fully offline" claim
+// actually holds. Versioned independently of the shell so a shell bump doesn't
+// force a multi-MB model re-download.
+const RUNTIME = 'stt-notes-runtime-v1';
+
+// Hosts whose GETs we cache at runtime: jsDelivr (library + ort-wasm-*.wasm) and
+// HuggingFace (model weights — endsWith covers cdn-lfs*.huggingface.co redirects;
+// .hf.co covers the newer Xet download hosts).
+function isCDNDep(url) {
+  const h = url.hostname;
+  return h === 'cdn.jsdelivr.net' || h.endsWith('huggingface.co') || h.endsWith('hf.co');
+}
+
+async function cacheFirstRuntime(request) {
+  const cache = await caches.open(RUNTIME);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+  const resp = await fetch(request);
+  // Only persist complete successful responses. 206 (range) throws on cache.put,
+  // and opaque/error responses (status 0 / !ok) shouldn't be stored.
+  if (resp.ok && resp.status === 200) cache.put(request, resp.clone());
+  return resp;
+}
 
 const SHELL = [
   './',
@@ -32,16 +59,27 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE && k !== RUNTIME).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', (e) => {
-  // Only intercept same-origin requests; let CDN and CalDAV requests pass through
-  if (new URL(e.request.url).origin !== location.origin) return;
-  e.respondWith(
-    caches.match(e.request).then(cached => cached ?? fetch(e.request))
-  );
+  const url = new URL(e.request.url);
+
+  // Same-origin: cache-first against the app-shell bucket.
+  if (url.origin === location.origin) {
+    e.respondWith(
+      caches.match(e.request).then(cached => cached ?? fetch(e.request))
+    );
+    return;
+  }
+
+  // Cross-origin CDN deps: cache-first on first use so the app boots offline even
+  // after the browser HTTP cache is evicted. Everything else (CalDAV, etc.) is
+  // left to pass through to the network untouched.
+  if (e.request.method === 'GET' && isCDNDep(url)) {
+    e.respondWith(cacheFirstRuntime(e.request));
+  }
 });

@@ -54,10 +54,12 @@ export function loadModel(model, quantized = true) {
 export function transcribe(float32Array, language) {
   return new Promise((resolve, reject) => {
     pendingTranscription = { resolve, reject };
-    const buffer = float32Array.buffer;
+    // Send a copy and transfer the copy's buffer, leaving the caller's array
+    // intact — the app keeps the original audio for re-transcribe / retry.
+    const copy = float32Array.slice();
     worker.postMessage(
-      { type: 'transcribe', audio: float32Array, language },
-      [buffer]
+      { type: 'transcribe', audio: copy, language },
+      [copy.buffer]
     );
   });
 }

@@ -54,3 +54,13 @@ export function stopRecording() {
     mediaRecorder.stop();
   });
 }
+
+// Discard an in-progress recording without transcribing: stop the recorder and
+// release the mic. No promise resolves — the captured chunks are dropped.
+export function cancelRecording() {
+  try {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  } catch { /* already stopped */ }
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  chunks.length = 0;
+}

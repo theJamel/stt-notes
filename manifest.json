@@ -1,13 +1,13 @@
 {
-  "name": "STT Notes",
-  "short_name": "STT Notes",
+  "name": "voxnote",
+  "short_name": "voxnote",
   "description": "Record a voice note and save it as a NextCloud task",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#15110e",
+  "theme_color": "#15110e",
   "lang": "en",
   "icons": [
     {
