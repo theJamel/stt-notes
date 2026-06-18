@@ -1,5 +1,5 @@
 // sw.js — service worker: cache-first for app shell
-const CACHE = 'stt-notes-v15';
+const CACHE = 'stt-notes-v16';
 
 // Separate bucket for cross-origin runtime deps (Transformers.js, ONNX WASM,
 // Whisper weights). These are too big/dynamic to precache in SHELL, and they'd

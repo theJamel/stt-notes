@@ -25,12 +25,13 @@
 
 html, body {
   height: 100%;
+  overflow: hidden;              /* no page-level scroll */
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
-  overscroll-behavior: none;     /* no white overscroll bleed past the dark page */
-  touch-action: manipulation;    /* disable double-tap / pinch zoom */
+  overscroll-behavior: none;
+  touch-action: manipulation;
 }
 
 button { font-family: inherit; }
@@ -38,12 +39,13 @@ button { font-family: inherit; }
 /* ---- Screen scaffold: a centered phone-width column ---- */
 .screen {
   height: 100dvh;
+  overflow: hidden;
   display: none;
   flex-direction: column;
   width: 100%;
   max-width: 440px;
   margin: 0 auto;
-  padding: max(14px, env(safe-area-inset-top)) 22px max(24px, env(safe-area-inset-bottom));
+  padding: max(14px, env(safe-area-inset-top)) 22px 0;
   position: relative;
 }
 
@@ -80,11 +82,13 @@ button { font-family: inherit; }
    ============================================================ */
 .main-center {
   flex: 1;
+  min-height: 0;           /* allow shrinking so footer is never pushed off-screen */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
+  padding-bottom: 90px;    /* clear the pinned footer */
 }
 
 .orb-wrap {
@@ -164,8 +168,14 @@ button { font-family: inherit; }
 .model-progress progress::-moz-progress-bar      { background: var(--accent); }
 .model-progress span { font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: center; }
 
-/* footer count card */
-.main-footer { padding-top: 18px; }
+/* footer count card — pinned to bottom, never participates in flex overflow */
+.main-footer {
+  position: absolute;
+  bottom: 0;
+  left: 22px;
+  right: 22px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+}
 .count-card {
   display: flex;
   justify-content: space-between;
