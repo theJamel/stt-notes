@@ -5,7 +5,7 @@ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transfo
 // Persist model weights in Cache API so a hard reload (which bypasses the SW)
 // doesn't force a full re-download. Cache API is only cleared by explicit
 // "Clear site data" — not by page reload, not by SW version bumps.
-const MODEL_CACHE = 'voxnote-model-v1';
+const MODEL_CACHE = 'voxnote-model-v2';
 const _fetch = globalThis.fetch.bind(globalThis);
 globalThis.fetch = async (input, init) => {
   let isModel = false;
@@ -73,7 +73,7 @@ async function loadModel(model) {
 
   transcriber = await pipeline('automatic-speech-recognition', model, {
     device: 'wasm',
-    dtype: 'q8',
+    dtype: 'q4',
     progress_callback,
   });
   self.postMessage({ status: 'ready', backend: 'wasm' });
@@ -100,6 +100,7 @@ self.addEventListener('message', async ({ data }) => {
         task:            'transcribe',
         chunk_length_s:  30,
         stride_length_s: 5,
+        max_new_tokens:  256,
       });
       self.postMessage({ status: 'complete', text: result.text });
     } catch (err) {

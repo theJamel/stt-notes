@@ -3,6 +3,26 @@ let mediaRecorder = null;
 let stream = null;
 const chunks = [];
 
+// Trim leading/trailing silence from a 16 kHz PCM Float32Array.
+// Uses windowed RMS energy; voiced frames above THRESH are kept, plus PAD on each side.
+const WINDOW = 320;   // 20 ms at 16 kHz
+const THRESH = 0.01;  // RMS ~-40 dBFS: above mic noise floor, below voiced speech
+const PAD    = 3200;  // 200 ms padding kept at each end to avoid clipping first/last phoneme
+
+function trimSilence(pcm) {
+  let first = -1, last = -1;
+  for (let i = 0; i + WINDOW <= pcm.length; i += WINDOW) {
+    let sum = 0;
+    for (let j = i; j < i + WINDOW; j++) sum += pcm[j] * pcm[j];
+    if (Math.sqrt(sum / WINDOW) >= THRESH) {
+      if (first === -1) first = i;
+      last = i + WINDOW;
+    }
+  }
+  if (first === -1) return pcm; // all silence — let isNoSpeech() handle it downstream
+  return pcm.subarray(Math.max(0, first - PAD), Math.min(pcm.length, last + PAD));
+}
+
 export async function startRecording() {
   stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
@@ -45,7 +65,7 @@ export function stopRecording() {
         source.start(0);
 
         const resampled = await offlineCtx.startRendering();
-        resolve(resampled.getChannelData(0));
+        resolve(trimSilence(resampled.getChannelData(0)));
       } catch (err) {
         reject(err);
       }
