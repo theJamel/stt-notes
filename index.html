@@ -65,6 +65,17 @@
       </div>
 
       <div class="field">
+        <label for="input-whisper-server">Whisper Server URL <span class="hint-inline">(optional)</span></label>
+        <div class="password-row">
+          <input id="input-whisper-server" type="url"
+            placeholder="http://localhost:8080"
+            autocapitalize="none" autocorrect="off" spellcheck="false">
+          <button type="button" id="btn-test-whisper" aria-label="Test server">TEST</button>
+        </div>
+        <span class="hint">Leave empty to transcribe on-device. Set to use a remote Whisper server (OpenAI-compatible API).</span>
+      </div>
+
+      <div class="field">
         <label for="input-language">Language</label>
         <select id="input-language">
           <option value="auto">Auto-detect</option>

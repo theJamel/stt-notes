@@ -1,7 +1,17 @@
 // audio.js — microphone capture and resampling to 16 kHz mono Float32Array
-let mediaRecorder = null;
+//
+// Captures raw PCM straight from the Web Audio graph rather than recording a
+// compressed Opus/WebM blob and decoding it back. The decode round-trip was
+// fragile across browsers — e.g. Firefox records a WebM/Opus container its own
+// decodeAudioData() can't read ("unknown content type"), and empty/very-short
+// recordings have no decodable header. Raw PCM sidesteps all of that and behaves
+// identically on Chrome, Firefox, Safari, and Android WebView.
 let stream = null;
-const chunks = [];
+let audioCtx = null;
+let sourceNode = null;
+let processorNode = null;
+let pcmChunks = [];     // Float32Array pieces at the AudioContext's native rate
+let capturing = false;
 
 // Trim leading/trailing silence from a 16 kHz PCM Float32Array.
 // Uses windowed RMS energy; voiced frames above THRESH are kept, plus PAD on each side.
@@ -26,61 +36,78 @@ function trimSilence(pcm) {
 export async function startRecording() {
   stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
 
-  const preferred = [
-    'audio/webm;codecs=opus',
-    'audio/ogg;codecs=opus',
-    'audio/webm',
-    'audio/ogg',
-  ];
-  const mimeType = preferred.find(t => MediaRecorder.isTypeSupported(t)) ?? '';
+  audioCtx = new AudioContext();
+  // A context can start suspended under autoplay policies — resume so the
+  // processor actually receives audio.
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-  mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
-  chunks.length = 0;
+  sourceNode = audioCtx.createMediaStreamSource(stream);
+  // ScriptProcessorNode is deprecated but universally supported (incl. Android
+  // WebView); AudioWorklet would need a separate module file, complicating the
+  // offline/precache story for no real gain here.
+  processorNode = audioCtx.createScriptProcessor(4096, 1, 1);
 
-  mediaRecorder.addEventListener('dataavailable', (e) => {
-    if (e.data.size > 0) chunks.push(e.data);
+  pcmChunks = [];
+  capturing = true;
+  processorNode.addEventListener('audioprocess', (e) => {
+    if (!capturing) return;
+    // The input buffer is reused each callback — copy out the samples.
+    pcmChunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
   });
 
-  mediaRecorder.start(100); // emit chunks every 100 ms
+  // A ScriptProcessorNode only runs while connected to a destination. Route it
+  // through a muted gain so we capture without playing the mic back (no echo).
+  const mute = audioCtx.createGain();
+  mute.gain.value = 0;
+  sourceNode.connect(processorNode);
+  processorNode.connect(mute);
+  mute.connect(audioCtx.destination);
 }
 
-export function stopRecording() {
-  return new Promise((resolve, reject) => {
-    mediaRecorder.addEventListener('stop', async () => {
-      stream.getTracks().forEach(t => t.stop());
-      try {
-        const blob = new Blob(chunks, { type: mediaRecorder.mimeType || 'audio/webm' });
-        const arrayBuffer = await blob.arrayBuffer();
-
-        const audioCtx = new AudioContext();
-        const decoded  = await audioCtx.decodeAudioData(arrayBuffer);
-        await audioCtx.close();
-
-        const targetRate = 16000;
-        const numFrames  = Math.ceil(decoded.duration * targetRate);
-        const offlineCtx = new OfflineAudioContext(1, numFrames, targetRate);
-        const source     = offlineCtx.createBufferSource();
-        source.buffer    = decoded;
-        source.connect(offlineCtx.destination);
-        source.start(0);
-
-        const resampled = await offlineCtx.startRendering();
-        resolve(trimSilence(resampled.getChannelData(0)));
-      } catch (err) {
-        reject(err);
-      }
-    }, { once: true });
-
-    mediaRecorder.stop();
-  });
+async function teardown() {
+  capturing = false;
+  try { processorNode?.disconnect(); } catch { /* already gone */ }
+  try { sourceNode?.disconnect(); } catch { /* already gone */ }
+  stream?.getTracks().forEach(t => t.stop());
+  if (audioCtx && audioCtx.state !== 'closed') { try { await audioCtx.close(); } catch {} }
+  processorNode = sourceNode = stream = null;
 }
 
-// Discard an in-progress recording without transcribing: stop the recorder and
-// release the mic. No promise resolves — the captured chunks are dropped.
+export async function stopRecording() {
+  // Nothing was captured (e.g. Stop pressed before the mic was granted): resolve
+  // empty so the caller treats it as no-speech, not an error.
+  if (!capturing) { await teardown(); return new Float32Array(0); }
+
+  const nativeRate = audioCtx.sampleRate;
+  const total = pcmChunks.reduce((n, c) => n + c.length, 0);
+  const merged = new Float32Array(total);
+  let offset = 0;
+  for (const c of pcmChunks) { merged.set(c, offset); offset += c.length; }
+  pcmChunks = [];
+  await teardown();
+
+  if (total === 0) return new Float32Array(0);
+
+  const targetRate = 16000;
+  if (nativeRate === targetRate) return trimSilence(merged);
+
+  // Resample native rate (typically 44.1/48 kHz) → 16 kHz via OfflineAudioContext.
+  const numFrames  = Math.ceil(merged.length * targetRate / nativeRate);
+  const offlineCtx = new OfflineAudioContext(1, numFrames, targetRate);
+  const buffer     = offlineCtx.createBuffer(1, merged.length, nativeRate);
+  buffer.copyToChannel(merged, 0);
+  const source     = offlineCtx.createBufferSource();
+  source.buffer    = buffer;
+  source.connect(offlineCtx.destination);
+  source.start(0);
+
+  const resampled = await offlineCtx.startRendering();
+  return trimSilence(resampled.getChannelData(0));
+}
+
+// Discard an in-progress recording without transcribing: stop capture and release
+// the mic. No promise resolves — the captured samples are dropped.
 export function cancelRecording() {
-  try {
-    if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
-  } catch { /* already stopped */ }
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  chunks.length = 0;
+  pcmChunks = [];
+  teardown();
 }

@@ -420,6 +420,7 @@ button { font-family: inherit; }
   color: var(--muted);
 }
 .hint { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.hint-inline { font-weight: 400; font-size: 12px; opacity: 0.7; }
 
 input, select, textarea {
   background: var(--surface);
@@ -436,7 +437,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 .password-row { display: flex; gap: 8px; }
 .password-row input { flex: 1; }
-#btn-show-password {
+#btn-show-password, #btn-test-whisper {
   background: var(--border);
   border: none;
   border-radius: 11px;
@@ -449,7 +450,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
   padding: 0 14px;
   flex-shrink: 0;
 }
-#btn-show-password:hover { color: var(--text); }
+#btn-show-password:hover, #btn-test-whisper:hover { color: var(--text); }
+#btn-test-whisper:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ============================================================
    Buttons (shared)

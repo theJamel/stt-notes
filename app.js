@@ -6,7 +6,7 @@
 // only once a transcription completes. You can keep recording in the meantime —
 // jobs queue and are processed one at a time.
 import { startRecording, stopRecording, cancelRecording } from './audio.js';
-import { initWorker, loadModel, transcribe } from './stt.js';
+import { initWorker, loadModel, transcribe, transcribeRemote, pingRemote } from './stt.js';
 import { createTodo, testConnection, discoverTaskLists } from './caldav.js';
 import { showScreen, getCurrentScreen, setModelReady, setProgress, showToast,
          setTranscribing, setTranscribeTime, setRecTimer, buildWave,
@@ -43,11 +43,16 @@ function saveSettings(s) { localStorage.setItem('stt_settings', JSON.stringify(s
 
 function populateSettingsForm() {
   if (!settings) return;
-  document.getElementById('input-url').value      = settings.url      ?? '';
-  document.getElementById('input-username').value = settings.username ?? '';
-  document.getElementById('input-password').value = settings.password ?? '';
-  document.getElementById('input-model').value    = settings.model    ?? 'onnx-community/whisper-tiny';
-  document.getElementById('input-language').value = settings.language ?? 'auto';
+  document.getElementById('input-url').value             = settings.url      ?? '';
+  document.getElementById('input-username').value        = settings.username ?? '';
+  document.getElementById('input-password').value        = settings.password ?? '';
+  document.getElementById('input-model').value           = settings.model    ?? 'onnx-community/whisper-tiny';
+  document.getElementById('input-whisper-server').value  = settings.whisperServer ?? '';
+  document.getElementById('input-language').value        = settings.language ?? 'auto';
+}
+
+function isRemoteMode() {
+  return !!(settings?.whisperServer && settings.whisperServer.trim());
 }
 
 function activeLang() {
@@ -87,6 +92,14 @@ async function loadLists() {
 function startApp() {
   updateRecordSub();
   setCreatedToday(getCreatedToday());
+
+  if (isRemoteMode()) {
+    // Remote mode — no local model download needed.
+    setModelReady(true);
+    showToast('Ready — remote server', 'success');
+    return;
+  }
+
   const model = settings?.model ?? 'onnx-community/whisper-tiny';
   if (!workerInitialized) {
     workerInitialized = true;
@@ -107,6 +120,9 @@ function startApp() {
 
 /* ---------------- recording ---------------- */
 async function beginRecording() {
+  // Acquire the mic and start capture BEFORE showing the recording screen.
+  // Otherwise the screen — with a working Stop button — is visible while the
+  // permission prompt is still pending, and an early Stop captures nothing.
   try {
     await startRecording();
   } catch (err) {
@@ -120,6 +136,7 @@ async function beginRecording() {
     }
     return;
   }
+
   buildWave();
   recSeconds = 0;
   setRecTimer(0);
@@ -146,7 +163,16 @@ function abortRecording() {
 }
 
 /* ---------------- background transcription queue ---------------- */
+// 16 kHz mono: below ~0.4 s there's no intelligible speech, and feeding such a
+// tiny buffer to the Whisper pipeline can make it hang. Treat it as no-speech
+// up front instead of queueing a job that may never come back.
+const MIN_AUDIO_SAMPLES = 6400; // 0.4 s at 16 kHz
+
 function enqueueTranscription(audio) {
+  if (!audio || audio.length < MIN_AUDIO_SAMPLES) {
+    onResultEmpty();
+    return;
+  }
   jobQueue.push({ id: ++jobSeq, audio, lang: activeLang() });
   updateBanner();
   pump();
@@ -159,7 +185,11 @@ async function pump() {
     const job = jobQueue.shift();
     updateBanner();
     try {
-      const text = (await transcribe(job.audio, job.lang) ?? '').trim();
+      const text = (await (
+        isRemoteMode()
+          ? transcribeRemote(job.audio, job.lang, settings.whisperServer.trim())
+          : transcribe(job.audio, job.lang)
+      ) ?? '').trim();
       if (!text || isNoSpeech(text)) {
         onResultEmpty();
       } else {
@@ -303,8 +333,31 @@ function firstLine(text) {
   return line.length > 60 ? line.slice(0, 57) + '…' : line;
 }
 
+/* ---------------- storage persistence ---------------- */
+// The Whisper weights (~255 MB) live in the Cache API. By default Android Chrome
+// treats origin storage as "best-effort" and evicts it under pressure, forcing a
+// full re-download on the next launch. Requesting persistence exempts Cache API /
+// IndexedDB from automatic eviction. Installed PWAs are *supposed* to be auto-
+// granted, but the heuristic is unreliable — so we ask explicitly.
+async function ensurePersistentStorage() {
+  if (!navigator.storage?.persist) return;
+  try {
+    const already = await navigator.storage.persisted();
+    const granted = already || await navigator.storage.persist();
+    const est = await navigator.storage.estimate();
+    const mb = (n) => Math.round((n ?? 0) / 1048576);
+    console.info(
+      `[storage] persisted=${granted} usage=${mb(est.usage)}MB quota=${mb(est.quota)}MB`,
+    );
+  } catch (err) {
+    console.warn('[storage] persistence check failed', err);
+  }
+}
+
 /* ---------------- init ---------------- */
 async function init() {
+  ensurePersistentStorage();
+
   // Service worker registration — auto-reload when a new SW activates
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then((reg) => {
@@ -349,11 +402,12 @@ async function init() {
   document.getElementById('form-settings').addEventListener('submit', (e) => {
     e.preventDefault();
     settings = {
-      url:      document.getElementById('input-url').value.trim(),
-      username: document.getElementById('input-username').value.trim(),
-      password: document.getElementById('input-password').value,
-      model:    document.getElementById('input-model').value,
-      language: document.getElementById('input-language').value,
+      url:           document.getElementById('input-url').value.trim(),
+      username:      document.getElementById('input-username').value.trim(),
+      password:      document.getElementById('input-password').value,
+      model:         document.getElementById('input-model').value,
+      whisperServer: document.getElementById('input-whisper-server').value.trim(),
+      language:      document.getElementById('input-language').value,
     };
     saveSettings(settings);
     showScreen('main');
@@ -373,6 +427,28 @@ async function init() {
       else showToast(`Connection failed: ${result.status} ${result.statusText}`, 'error');
     } catch (err) {
       showToast(`Network error: ${err.message}`, 'error');
+    }
+  });
+
+  // Test Whisper server — sends a short silent clip through the real transcription
+  // endpoint to verify the URL is reachable and CORS-enabled.
+  document.getElementById('btn-test-whisper').addEventListener('click', async (e) => {
+    const url = document.getElementById('input-whisper-server').value.trim();
+    if (!url) { showToast('Enter a server URL first', 'error'); return; }
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      await pingRemote(url);
+      showToast('Whisper server reachable', 'success');
+    } catch (err) {
+      // A blocked CORS/mixed-content request or an unreachable server both surface
+      // as a TypeError with no status — point the user at the likely causes.
+      const hint = err instanceof TypeError
+        ? 'Could not reach server — check it is running, the URL, CORS, and HTTP/HTTPS (mixed content).'
+        : err.message;
+      showToast(`Server test failed: ${hint}`, 'error');
+    } finally {
+      btn.disabled = false;
     }
   });
 

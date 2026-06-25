@@ -1,20 +1,21 @@
 // sw.js — service worker: cache-first for app shell
-const CACHE = 'stt-notes-v18';
+const CACHE = 'stt-notes-v21';
 
-// Separate bucket for cross-origin runtime deps (Transformers.js, ONNX WASM,
-// Whisper weights). These are too big/dynamic to precache in SHELL, and they'd
+// Separate bucket for cross-origin runtime deps (Transformers.js library + ONNX
+// WASM from jsDelivr). These are too big/dynamic to precache in SHELL, and they'd
 // otherwise live only in the evictable browser HTTP cache — once evicted the app
 // can't boot offline. We cache them on first use so the "fully offline" claim
-// actually holds. Versioned independently of the shell so a shell bump doesn't
-// force a multi-MB model re-download.
-const RUNTIME = 'stt-notes-runtime-v1';
+// actually holds. Bumped to v2 to flush the old bucket, which redundantly held a
+// second copy of the model weights (now owned solely by worker.js).
+const RUNTIME = 'stt-notes-runtime-v2';
 
-// Hosts whose GETs we cache at runtime: jsDelivr (library + ort-wasm-*.wasm) and
-// HuggingFace (model weights — endsWith covers cdn-lfs*.huggingface.co redirects;
-// .hf.co covers the newer Xet download hosts).
+// Hosts whose GETs we cache at runtime: jsDelivr only (Transformers.js library +
+// ort-wasm-*.wasm). The Whisper model weights from HuggingFace are deliberately
+// NOT cached here — the Web Worker (worker.js) owns a single, query-normalized
+// model cache. Caching them here too would store the same ~255 MB a second time,
+// inflating quota usage and making eviction far more likely.
 function isCDNDep(url) {
-  const h = url.hostname;
-  return h === 'cdn.jsdelivr.net' || h.endsWith('huggingface.co') || h.endsWith('hf.co');
+  return url.hostname === 'cdn.jsdelivr.net';
 }
 
 async function cacheFirstRuntime(request) {
